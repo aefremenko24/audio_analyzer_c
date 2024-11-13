@@ -432,7 +432,7 @@ void process_stream(int deviceSelection, streamCallbackData *currentSpectroData,
   err = Pa_StartStream(stream);
   checkErr(err);
 
-  unsigned char input = getch();
+  unsigned char input = '\0';
   while (input != ' ' && input != 'r') {
     input = tolower(getch());
     if (input == 'r') {
