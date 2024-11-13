@@ -337,8 +337,8 @@ int prompt_device() {
  */
 streamCallbackData *init_spectro_data() {
   spectroData = (streamCallbackData *) malloc(sizeof(streamCallbackData));
-  spectroData->in = (double *) malloc(sizeof(float) * FRAMES_PER_BUFFER);
-  spectroData->out = (double *) malloc(sizeof(float) * FRAMES_PER_BUFFER);
+  spectroData->in = (double *) fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
+  spectroData->out = (double *) (double *) fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
   if (spectroData->in == NULL || spectroData->out == NULL) {
     printf("Could not allocate spectro data.\n");
     exit(EXIT_FAILURE);
