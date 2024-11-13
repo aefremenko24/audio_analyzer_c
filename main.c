@@ -142,6 +142,7 @@ static streamCallbackData *spectroData;
 static void checkErr(PaError err) {
   if (err != paNoError) {
     printf("PortAudio error: %s", Pa_GetErrorText(err));
+    endwin();
     exit(EXIT_FAILURE);
   }
 }
@@ -397,7 +398,6 @@ void init_stream(PaError *err) {
 void process_stream(int deviceSelection, streamCallbackData *currentSpectroData, PaError err) {
 
   PaStreamParameters inputParameters;
-  PaStreamParameters outputParameters;
 
   memset(&inputParameters, 0, sizeof(inputParameters));
   inputParameters.channelCount = Pa_GetDeviceInfo(deviceSelection)->maxInputChannels;
@@ -405,13 +405,6 @@ void process_stream(int deviceSelection, streamCallbackData *currentSpectroData,
   inputParameters.hostApiSpecificStreamInfo = NULL;
   inputParameters.sampleFormat = paFloat32;
   inputParameters.suggestedLatency = Pa_GetDeviceInfo(deviceSelection)->defaultLowInputLatency;
-
-  memset(&outputParameters, 0, sizeof(outputParameters));
-  outputParameters.channelCount = Pa_GetDeviceInfo(deviceSelection)->maxOutputChannels;
-  outputParameters.device = deviceSelection;
-  outputParameters.hostApiSpecificStreamInfo = NULL;
-  outputParameters.sampleFormat = paFloat32;
-  outputParameters.suggestedLatency = Pa_GetDeviceInfo(deviceSelection)->defaultLowInputLatency;
 
   num_channels = inputParameters.channelCount;
   init_screen(num_channels);
@@ -453,6 +446,7 @@ int main() {
   streamCallbackData *currentSpectroData = init_spectro_data();
   int deviceSelection = prompt_device();
   process_stream(deviceSelection, currentSpectroData, err);
+  endwin();
 
   return EXIT_SUCCESS;
 }
