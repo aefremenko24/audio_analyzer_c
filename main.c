@@ -1,13 +1,11 @@
 #include <stdlib.h>
-#include <iostream>
-#include <cstring>
-#include <cmath>
+#include <math.h>
 
 #include <portaudio.h>
 #include <fftw3.h>
 #include <curses.h>
-
-using namespace std;
+#include <string.h>
+#include <ctype.h>
 
 /**
 NOTE: Coordinates used in this project assume (0, 0) is the top left corner of the terminal.
@@ -46,7 +44,7 @@ WINDOW *FREQ_WIN;
 
 /// Map representing the recent maximum measurement of the amplitude at each frequency.
 /// Each value in the map will be decremented over time until new max is set.
-std::unordered_map<int, double> current_max;
+float current_max[WIN_WIDTH];
 
 /// Number of input channels for the input source the program is working with
 int num_channels;
@@ -54,20 +52,20 @@ int num_channels;
 /**
  * Initializes the volume display window using ncurses, given the number of channels in the input.
  *
- * @param num_channels number of channels in the input; directly affects the height of the window.
+ * @param num_chan number of channels in the input; directly affects the height of the window.
  */
-void init_vol_win(int num_channels = 1) {
-  VOL_WIN = newwin(num_channels + 1, WIN_WIDTH, 0, 0);
+void init_vol_win(int num_chan) {
+  VOL_WIN = newwin(num_chan + 1, WIN_WIDTH, 0, 0);
   waddstr(VOL_WIN, "Volume:\n");
 }
 
 /**
  * Initializes the frequency display window using ncurses, given the number of channels in the input.
  *
- * @param num_channels number of channels in the input; affects the initial y position of the window.
+ * @param num_chan number of channels in the input; affects the initial y position of the window.
  */
-void init_freq_win(int num_channels = 1) {
-  FREQ_WIN = newwin(FREQ_WIN_HEIGHT, WIN_WIDTH, num_channels + 1 + MARGIN, 0);
+void init_freq_win(int num_chan) {
+  FREQ_WIN = newwin(FREQ_WIN_HEIGHT, WIN_WIDTH, num_chan + 1 + MARGIN, 0);
   waddstr(FREQ_WIN, "Frequencies:\n");
 }
 
@@ -85,9 +83,9 @@ void init_current_max() {
  * Called every time streamCallBack is returned.
  */
 void decrement_current_max() {
-  double decrement = 0.0003 * (double) FREQ_WIN_HEIGHT;
+  float decrement = 0.0003 * (float) FREQ_WIN_HEIGHT;
   for (int freq = 0; freq < WIN_WIDTH; freq++) {
-    if (current_max[freq] * (double) FREQ_WIN_HEIGHT > decrement) {
+    if (current_max[freq] * (float) FREQ_WIN_HEIGHT > decrement) {
       current_max[freq] -= decrement;
     }
   }
@@ -96,13 +94,13 @@ void decrement_current_max() {
 /**
  * Initializes the ncurses screen with windows for each section of the view.
  *
- * @param num_channels number of channels in the input; affects the total height of all windows on the screen.
+ * @param num_chan number of channels in the input; affects the total height of all windows on the screen.
  */
-void init_screen(int num_channels = 1) {
+void init_screen(int num_chan) {
   init_current_max();
   initscr();
-  init_vol_win(num_channels);
-  init_freq_win(num_channels);
+  init_vol_win(num_chan);
+  init_freq_win(num_chan);
 }
 
 /**
@@ -146,7 +144,7 @@ static streamCallbackData *spectroData;
 
 static void checkErr(PaError err) {
   if (err != paNoError) {
-    std::cout << "PortAudio error: " << Pa_GetErrorText(err) << std::endl;
+    printf("PortAudio error: %s", Pa_GetErrorText(err));
     exit(EXIT_FAILURE);
   }
 }
@@ -172,7 +170,7 @@ void streamCallBackVolume(
 
   for (unsigned long i = 0; i < framesPerBuffer * NUM_CHANNELS; i += NUM_CHANNELS) {
     for (unsigned long channelNum = 0; channelNum < NUM_CHANNELS; channelNum++) {
-      channelVolumes[channelNum] = max(channelVolumes[channelNum], abs(in[i + channelNum]));
+      channelVolumes[channelNum] = fmax(channelVolumes[channelNum], abs(in[i + channelNum]));
     }
   }
 
@@ -204,11 +202,10 @@ void display_current_max() {
   int initial_y;
   getyx(FREQ_WIN, initial_y, initial_x);
 
-  for (const std::pair<int, double> &n: current_max) {
-    int y_pos = 1 + FREQ_WIN_HEIGHT - (int) ((double) FREQ_WIN_HEIGHT * n.second);
-    int x_pos = n.first;
+  for (int width_index = 0; width_index < WIN_WIDTH; width_index++) {
+    int y_pos = 1 + FREQ_WIN_HEIGHT - (int) ((float) FREQ_WIN_HEIGHT * current_max[width_index]);
 
-    wmove(FREQ_WIN, y_pos, x_pos);
+    wmove(FREQ_WIN, y_pos, width_index);
     waddch(FREQ_WIN, '_');
   }
 
@@ -242,13 +239,10 @@ void streamCallBackFrequencies(
 
   for (int i = 0; i < WIN_WIDTH; i++) {
     double freq = pow(i / ((double) WIN_WIDTH), 2);
-    double proportion = callbackData->out[(int) (callbackData->startIndex + freq
-                                                                            *
-                                                                            callbackData->spectroSize)] /
-                        5;
+    double proportion = callbackData->out[(int) (callbackData->startIndex + freq * callbackData->spectroSize)] / 5;
 
     if (abs(proportion) > current_max[i]) {
-      current_max[i] = min(abs(proportion), 1.0);
+      current_max[i] = fmin(abs(proportion), 1.0);
     }
 
     for (int j = 1; j < FREQ_WIN_HEIGHT; j++) {
@@ -307,33 +301,33 @@ static int streamCallBack(
 int prompt_device() {
   int numDevices = Pa_GetDeviceCount();
   if (numDevices < 0) {
-    cout << "Encountered error while getting the number of devices." << endl;
+    printf("Encountered error while getting the number of devices.\n");
     exit(EXIT_FAILURE);
   } else if (numDevices == 0) {
-    cout << "No devices found on this machine." << endl;
+    printf("No devices found on this machine.\n");
     exit(EXIT_SUCCESS);
   }
-  cout << "Number of devices:" << numDevices << endl;
+  printf("Number of devices: %d\n", numDevices);
 
   const PaDeviceInfo *deviceInfo;
 
   for (int device_index = 0; device_index < numDevices; device_index++) {
     deviceInfo = Pa_GetDeviceInfo(device_index);
-    cout << "Device #" << device_index << endl;
-    cout << "\tName: " << deviceInfo->name << endl;
-    cout << "\tMax Input Channels: " << deviceInfo->maxInputChannels << endl;
-    cout << "\tMax Output Channels: " << deviceInfo->maxOutputChannels << endl;
-    cout << "\tDefault Sample Rate: " << deviceInfo->defaultSampleRate << endl;
+    printf("Device # %d\n", device_index);
+    printf("\tName: %s\n", deviceInfo->name);
+    printf("\tMax Input Channels: %d\n", deviceInfo->maxInputChannels);
+    printf("\tMax Output Channels: %d\n", deviceInfo->maxOutputChannels);
+    printf("\tDefault Sample Rate: %f\n", deviceInfo->defaultSampleRate);
   }
 
   int deviceSelection;
-  cout << "\nWhich device would you like to use? Enter a number from 0 to " << numDevices - 1
-       << " below:" << endl;
-  cin >> deviceSelection;
+  printf("\nWhich device would you like to use? Enter a number from 0 to %d %s\n", numDevices - 1, "below:");
+  int input_check;
+  input_check = scanf("%d", &deviceSelection);
 
-  while (cin.fail() || deviceSelection < 0 || deviceSelection > numDevices - 1) {
-    cout << "Device index entered is invalid. Try again:" << endl;
-    cin >> deviceSelection;
+  while (input_check != 1 || deviceSelection < 0 || deviceSelection > numDevices - 1) {
+    printf("Device index entered is invalid. Try again:\n");
+    input_check = scanf("%d", &deviceSelection);
   }
 
   return deviceSelection;
@@ -348,16 +342,16 @@ streamCallbackData *init_spectro_data() {
   spectroData = (streamCallbackData *) malloc(sizeof(streamCallbackData));
   spectroData->in = (double *) malloc(sizeof(double) * FRAMES_PER_BUFFER);
   spectroData->out = (double *) malloc(sizeof(double) * FRAMES_PER_BUFFER);
-  if (spectroData->in == nullptr || spectroData->out == nullptr) {
-    cout << "Could not allocate spectro data." << endl;
+  if (spectroData->in == NULL || spectroData->out == NULL) {
+    printf("Could not allocate spectro data.\n");
     exit(EXIT_FAILURE);
   }
   spectroData->p = fftw_plan_r2r_1d(FRAMES_PER_BUFFER, spectroData->in, spectroData->out,
                                     FFTW_R2HC, FFTW_ESTIMATE);
 
   double sampleRatio = FRAMES_PER_BUFFER / SAMPLE_RATE;
-  spectroData->startIndex = std::ceil(sampleRatio * SPECTRO_FREQ_START);
-  spectroData->spectroSize = min(std::ceil(sampleRatio * SPECTRO_FREQ_END),
+  spectroData->startIndex = ceil(sampleRatio * SPECTRO_FREQ_START);
+  spectroData->spectroSize = fmin(ceil(sampleRatio * SPECTRO_FREQ_END),
                                  FRAMES_PER_BUFFER / 2.0)
                              - spectroData->startIndex;
 
@@ -411,14 +405,14 @@ void process_stream(int deviceSelection, streamCallbackData *spectroData, PaErro
   memset(&inputParameters, 0, sizeof(inputParameters));
   inputParameters.channelCount = Pa_GetDeviceInfo(deviceSelection)->maxInputChannels;
   inputParameters.device = deviceSelection;
-  inputParameters.hostApiSpecificStreamInfo = nullptr;
+  inputParameters.hostApiSpecificStreamInfo = NULL;
   inputParameters.sampleFormat = paFloat32;
   inputParameters.suggestedLatency = Pa_GetDeviceInfo(deviceSelection)->defaultLowInputLatency;
 
   memset(&outputParameters, 0, sizeof(outputParameters));
   outputParameters.channelCount = Pa_GetDeviceInfo(deviceSelection)->maxOutputChannels;
   outputParameters.device = deviceSelection;
-  outputParameters.hostApiSpecificStreamInfo = nullptr;
+  outputParameters.hostApiSpecificStreamInfo = NULL;
   outputParameters.sampleFormat = paFloat32;
   outputParameters.suggestedLatency = Pa_GetDeviceInfo(deviceSelection)->defaultLowInputLatency;
 
@@ -429,7 +423,7 @@ void process_stream(int deviceSelection, streamCallbackData *spectroData, PaErro
   err = Pa_OpenStream(
       &stream,
       &inputParameters,
-      nullptr,
+      NULL,
       SAMPLE_RATE,
       FRAMES_PER_BUFFER,
       paNoFlag,
