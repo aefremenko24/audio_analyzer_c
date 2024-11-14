@@ -12,11 +12,20 @@ NOTE: Coordinates used in this project assume (0, 0) is the top left corner of t
  Increasing y moves the cursor down; increasing x moves the cursor to the right.
  */
 
+/**
+ * Enum representing the type of signal the user is working with (input or output)
+ */
+enum SignalType {
+  Input,
+  Output
+};
+
+
 /// Rate at which the audio is sampled, in Hz
 #define SAMPLE_RATE 44100.0
 
 /// Number of data points collected in a single buffer
-#define FRAMES_PER_BUFFER 1024
+#define FRAMES_PER_BUFFER 256
 
 /// Frequency display range minimum and maximum (normal human hearing range here)
 #define SPECTRO_FREQ_START 20
@@ -43,8 +52,11 @@ WINDOW *FREQ_WIN;
 /// Each value in the map will be decremented over time until new max is set.
 float current_max[WIN_WIDTH];
 
-/// Number of input channels for the input source the program is working with
-int num_channels;
+/// Number of input channels for the input source the program is working with.
+int num_input_channels;
+
+/// Number of output channels for the output source the program is working with.
+int num_output_channels;
 
 /**
  * Initializes the volume display window using ncurses, given the number of channels in the input.
@@ -155,20 +167,29 @@ static void checkErr(PaError err) {
  * @param framesPerBuffer Number of frames in the buffer.
  */
 void streamCallBackVolume(
-    const void *inputBuffer, unsigned long framesPerBuffer
+    const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer
 ) {
   float *in = (float *) inputBuffer;
+  float *out = (float *) outputBuffer;
 
-  const int NUM_CHANNELS = num_channels;
-  float channelVolumes[NUM_CHANNELS];
+  const int NUM_INPUT_CHANNELS = num_input_channels;
+  const int NUM_OUTPUT_CHANNELS = num_output_channels;
+  float channelVolumes[NUM_INPUT_CHANNELS];
 
-  for (unsigned long channelNum = 0; channelNum < NUM_CHANNELS; channelNum++) {
+  for (unsigned long channelNum = 0; channelNum < NUM_INPUT_CHANNELS; channelNum++) {
     channelVolumes[channelNum] = 0.0f;
   }
 
-  for (unsigned long i = 0; i < framesPerBuffer * NUM_CHANNELS; i += NUM_CHANNELS) {
-    for (unsigned long channelNum = 0; channelNum < NUM_CHANNELS; channelNum++) {
+  for (unsigned long i = 0; i < framesPerBuffer * NUM_INPUT_CHANNELS; i += NUM_INPUT_CHANNELS) {
+    for (unsigned long channelNum = 0; channelNum < NUM_INPUT_CHANNELS; channelNum++) {
       channelVolumes[channelNum] = fmaxf(channelVolumes[channelNum], fabsf(in[i + channelNum]));
+    }
+  }
+
+  for (unsigned long i = 0; i < framesPerBuffer * NUM_OUTPUT_CHANNELS; i += NUM_OUTPUT_CHANNELS) {
+    for (unsigned long channelNum = 0; channelNum < NUM_OUTPUT_CHANNELS; channelNum++) {
+      *out++ = in[i];
+      *out++ = in[i];
     }
   }
 
@@ -176,7 +197,7 @@ void streamCallBackVolume(
   int initial_y;
   getyx(VOL_WIN, initial_y, initial_x);
 
-  for (unsigned long channelNum = 0; channelNum < NUM_CHANNELS; channelNum++) {
+  for (unsigned long channelNum = 0; channelNum < NUM_INPUT_CHANNELS; channelNum++) {
     wmove(VOL_WIN, VOL_INIT_Y + channelNum + 1, VOL_INIT_X);
     for (int i = 0; i < WIN_WIDTH; i++) {
       float barProportion = (float)i / ((float) WIN_WIDTH);
@@ -219,10 +240,11 @@ void display_current_max() {
  * @param userData Callback data used for FFT computations.
  */
 void streamCallBackFrequencies(
-    const void *inputBuffer, unsigned long framesPerBuffer,
+    const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer,
     void *userData
 ) {
   float *in = (float *) inputBuffer;
+
   streamCallbackData *callbackData = (streamCallbackData *) userData;
 
   for (unsigned long i = 0; i < framesPerBuffer; i++) {
@@ -277,13 +299,12 @@ static int streamCallBack(
     const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags,
     void *userData
 ) {
-  (void) outputBuffer;
   (void) timeInfo;
   (void) statusFlags;
 
-  streamCallBackVolume(inputBuffer, framesPerBuffer);
+  streamCallBackVolume(inputBuffer, outputBuffer, framesPerBuffer);
 
-  streamCallBackFrequencies(inputBuffer, framesPerBuffer, userData);
+  streamCallBackFrequencies(inputBuffer, outputBuffer, framesPerBuffer, userData);
 
   refresh_screen();
 
@@ -294,9 +315,19 @@ static int streamCallBack(
  * Displays a list of all available CoreAudio(macOS) or ALSA (Linux) devices
  * and prompts the user to choose the one they wish to work with.
  *
+ * @param signalType Type of signal the user is working with. Either Input or Output.
  * @return Device number selected by the user. Value between 1 and number of devices available.
  */
-int prompt_device() {
+int prompt_device(enum SignalType signalType) {
+  if (signalType == Output) {
+    char selectOutput;
+    printf("Would you like to select an output source? (y/n)\n");
+    scanf(" %c", &selectOutput);
+    if (selectOutput != 'y') {
+      return -1;
+    }
+  }
+
   int numDevices = Pa_GetDeviceCount();
   if (numDevices < 0) {
     printf("Encountered error while getting the number of devices.\n");
@@ -318,14 +349,25 @@ int prompt_device() {
     printf("\tDefault Sample Rate: %f\n", deviceInfo->defaultSampleRate);
   }
 
+  char* signal_type = signalType == Input ? "input" : "output";
   int deviceSelection;
-  printf("\nWhich device would you like to use? Enter a number from 0 to %d %s\n", numDevices - 1, "below:");
+  printf("\nWhich %s device would you like to use? Enter a number from 0 to %d %s\n", signal_type, numDevices - 1, "below:");
   int input_check;
   input_check = scanf("%d", &deviceSelection);
 
   while (input_check != 1 || deviceSelection < 0 || deviceSelection > numDevices - 1) {
     printf("Device index entered is invalid. Try again:\n");
     input_check = scanf("%d", &deviceSelection);
+  }
+
+  while (signalType == Input && Pa_GetDeviceInfo(deviceSelection)->maxInputChannels == 0) {
+    printf("This device has no input channels. Select a different one.\n");
+    scanf("%d", &deviceSelection);
+  }
+
+  while (signalType == Output && Pa_GetDeviceInfo(deviceSelection)->maxOutputChannels == 0) {
+    printf("This device has no output channels. Select a different one.\n");
+    scanf("%d", &deviceSelection);
   }
 
   return deviceSelection;
@@ -395,25 +437,36 @@ void init_stream(PaError *err) {
  * @param currentSpectroData Spectro data used for FFT processing.
  * @param err PulseAudio error code.
  */
-void process_stream(int deviceSelection, streamCallbackData *currentSpectroData, PaError err) {
+void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamCallbackData *currentSpectroData, PaError err) {
 
   PaStreamParameters inputParameters;
+  PaStreamParameters outputParameters;
 
   memset(&inputParameters, 0, sizeof(inputParameters));
-  inputParameters.channelCount = Pa_GetDeviceInfo(deviceSelection)->maxInputChannels;
-  inputParameters.device = deviceSelection;
+  inputParameters.channelCount = Pa_GetDeviceInfo(inputDeviceSelection)->maxInputChannels;
+  inputParameters.device = inputDeviceSelection;
   inputParameters.hostApiSpecificStreamInfo = NULL;
   inputParameters.sampleFormat = paFloat32;
-  inputParameters.suggestedLatency = Pa_GetDeviceInfo(deviceSelection)->defaultLowInputLatency;
+  inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputDeviceSelection)->defaultLowInputLatency;
 
-  num_channels = inputParameters.channelCount;
-  init_screen(num_channels);
+  if (outputDeviceSelection != -1) {
+    memset(&outputParameters, 0, sizeof(outputParameters));
+    outputParameters.channelCount = Pa_GetDeviceInfo(outputDeviceSelection)->maxOutputChannels;
+    outputParameters.device = outputDeviceSelection;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.sampleFormat = paFloat32;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputDeviceSelection)->defaultLowInputLatency;
+    num_output_channels = outputParameters.channelCount;
+  }
+
+  num_input_channels = inputParameters.channelCount;
+  init_screen(num_input_channels);
 
   PaStream *stream;
   err = Pa_OpenStream(
       &stream,
       &inputParameters,
-      NULL,
+      &outputParameters,
       SAMPLE_RATE,
       FRAMES_PER_BUFFER,
       paNoFlag,
@@ -432,7 +485,7 @@ void process_stream(int deviceSelection, streamCallbackData *currentSpectroData,
       close_stream(stream, currentSpectroData, err);
       init_stream(&err);
       currentSpectroData = init_spectro_data();
-      return process_stream(deviceSelection, currentSpectroData, err);
+      return process_stream(inputDeviceSelection, outputDeviceSelection, currentSpectroData, err);
     }
   }
 
@@ -444,8 +497,9 @@ int main() {
 
   init_stream(&err);
   streamCallbackData *currentSpectroData = init_spectro_data();
-  int deviceSelection = prompt_device();
-  process_stream(deviceSelection, currentSpectroData, err);
+  int inputDeviceSelection = prompt_device(Input);
+  int outputDeviceSelection = prompt_device(Output);
+  process_stream(inputDeviceSelection, outputDeviceSelection, currentSpectroData, err);
   endwin();
 
   return EXIT_SUCCESS;
