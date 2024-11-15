@@ -1,4 +1,28 @@
-#include "utils.h"
+#include <fftw3.h>
+
+/// Data structure representing the frequency view window
+WINDOW *FREQ_WIN;
+
+/**
+ * Contains the data used for a singular stream call back.
+ */
+typedef struct {
+
+  /// Array of size FRAMES_PER_BUFFER * num_channels, containing amplitudes of the input wave in the current buffer.
+  double *in;
+
+  /// Array of size FRAMES_PER_BUFFER * num_channels, containing amplitudes of the output wave in the current buffer.
+  double *out;
+
+  /// Contains information required to compute an FFT of the buffered waveform.
+  fftw_plan p;
+
+  /// Starting x-coordinate of the computed FFT graph.
+  int startIndex;
+
+  /// Size of the delta between each consecutive x-coordinate on the FFT graph.
+  int spectroSize;
+} streamCallbackData;
 
 /**
  * Initializes the frequency display window using ncurses, given the number of channels in the input.

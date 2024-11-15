@@ -1,3 +1,8 @@
+#include <curses.h>
+
+/// Data structure representing the volume and frequency view windows
+WINDOW *VOL_WIN;
+
 /**
  * Renders the volume representation of the given input buffer.
  * The volume is rendered as a line of '=' characters of length between 0 and WIN_WIDTH.

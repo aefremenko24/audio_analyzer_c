@@ -36,12 +36,10 @@ static int streamCallBack(
 
 /**
  * Initializes a PulseAudio stream.
- *
- * @param err PulseAudio error code.
  */
-void init_stream(PaError *err) {
-  *err = Pa_Initialize();
-  checkErr(*err);
+void init_stream() {
+  PaError err = Pa_Initialize();
+  checkErr(err);
 }
 
 /**
@@ -49,10 +47,9 @@ void init_stream(PaError *err) {
  *
  * @param stream Stream to be closed.
  * @param currentSpectroData Spectro data used for FFT computations.
- * @param err PulseAudio error code.
  */
-void close_stream(PaStream *stream, streamCallbackData *currentSpectroData, PaError err) {
-  err = Pa_CloseStream(stream);
+void close_stream(PaStream *stream, streamCallbackData *currentSpectroData) {
+  PaError err = Pa_CloseStream(stream);
   checkErr(err);
 
   err = Pa_Terminate();
@@ -73,7 +70,7 @@ void close_stream(PaStream *stream, streamCallbackData *currentSpectroData, PaEr
  * @param currentSpectroData Spectro data used for FFT processing.
  * @param err PulseAudio error code.
  */
-void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamCallbackData *currentSpectroData, PaError err) {
+void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamCallbackData *currentSpectroData) {
 
   PaStreamParameters inputParameters;
   PaStreamParameters outputParameters;
@@ -85,7 +82,7 @@ void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamC
   inputParameters.sampleFormat = paFloat32;
   inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputDeviceSelection)->defaultLowInputLatency;
 
-  if (outputDeviceSelection != -1) {
+  if (outputDeviceSelection >= 0) {
     memset(&outputParameters, 0, sizeof(outputParameters));
     outputParameters.channelCount = Pa_GetDeviceInfo(outputDeviceSelection)->maxOutputChannels;
     outputParameters.device = outputDeviceSelection;
@@ -99,10 +96,10 @@ void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamC
   init_screen(num_input_channels);
 
   PaStream *stream;
-  err = Pa_OpenStream(
+  PaError err = Pa_OpenStream(
       &stream,
       &inputParameters,
-      &outputParameters,
+      outputDeviceSelection >= 0 ? &outputParameters : NULL,
       SAMPLE_RATE,
       FRAMES_PER_BUFFER,
       paNoFlag,
@@ -118,12 +115,12 @@ void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamC
   while (input != ' ' && input != 'r') {
     input = tolower(getch());
     if (input == 'r') {
-      close_stream(stream, currentSpectroData, err);
-      init_stream(&err);
+      close_stream(stream, currentSpectroData);
+      init_stream();
       currentSpectroData = init_spectro_data();
-      return process_stream(inputDeviceSelection, outputDeviceSelection, currentSpectroData, err);
+      return process_stream(inputDeviceSelection, outputDeviceSelection, currentSpectroData);
     }
   }
 
-  close_stream(stream, currentSpectroData, err);
+  close_stream(stream, currentSpectroData);
 }

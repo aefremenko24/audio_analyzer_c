@@ -1,8 +1,8 @@
-#include "utils.h"
 #include <fftw3.h>
 #include <math.h>
 #include "display.h"
 #include <stdlib.h>
+#include "frequencies.h"
 
 /**
  * Initializes the frequency display window using ncurses, given the number of channels in the input.

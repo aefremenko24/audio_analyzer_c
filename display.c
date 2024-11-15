@@ -1,11 +1,6 @@
 #include "volume.h"
 #include "frequencies.h"
-
-/**
- * Map representing the recent maximum measurement of the amplitude at each frequency.
- * Each value in the map will be decremented over time until new max is set.
- */
-float current_max[WIN_WIDTH];
+#include "display.h"
 
 /**
  * Fills the current local-max map with 0s (initial state).

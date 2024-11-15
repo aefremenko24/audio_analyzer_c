@@ -1,3 +1,5 @@
+#include "utils.h"
+
 /**
 NOTE: Coordinates used in this project assume (0, 0) is the top left corner of the terminal.
  Increasing y moves the cursor down; increasing x moves the cursor to the right.
@@ -7,7 +9,7 @@ NOTE: Coordinates used in this project assume (0, 0) is the top left corner of t
  * Map representing the recent maximum measurement of the amplitude at each frequency.
  * Each value in the map will be decremented over time until new max is set.
  */
-float *current_max;
+float current_max[WIN_WIDTH];
 
 /**
  * Fills the current local-max map with 0s (initial state).

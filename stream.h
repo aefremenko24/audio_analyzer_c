@@ -19,25 +19,21 @@ static int streamCallBack(
 
 /**
  * Initializes a PulseAudio stream.
- *
- * @param err PulseAudio error code.
  */
-void init_stream(PaError *err);
+void init_stream();
 
 /**
  * Closes the stream and cleans up all the allocated memory used during the program runtime.
  *
  * @param stream Stream to be closed.
  * @param currentSpectroData Spectro data used for FFT computations.
- * @param err PulseAudio error code.
  */
-void close_stream(PaStream *stream, streamCallbackData *currentSpectroData, PaError err);
+void close_stream(PaStream *stream, streamCallbackData *currentSpectroData);
 
 /**
  * Runs the stream processing for the selected device from start to finish.
  *
  * @param deviceSelection User's device selection.
  * @param currentSpectroData Spectro data used for FFT processing.
- * @param err PulseAudio error code.
  */
-void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamCallbackData *currentSpectroData, PaError err);
+void process_stream(int inputDeviceSelection, int outputDeviceSelection, streamCallbackData *currentSpectroData);

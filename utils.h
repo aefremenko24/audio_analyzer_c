@@ -2,13 +2,6 @@
 #include <fftw3.h>
 #include <portaudio.h>
 
-/// Data structure representing the volume and frequency view windows
-WINDOW *VOL_WIN;
-WINDOW *FREQ_WIN;
-
-/// Width of the console display window in number of characters
-#define WIN_WIDTH 100
-
 /// The height of the frequency view window in number of lines
 #define FREQ_WIN_HEIGHT 20
 
@@ -45,27 +38,6 @@ int num_input_channels;
 
 /// Number of output channels for the output source the program is working with.
 int num_output_channels;
-
-/**
- * Contains the data used for a singular stream call back.
- */
-typedef struct {
-
-  /// Array of size FRAMES_PER_BUFFER * num_channels, containing amplitudes of the input wave in the current buffer.
-  double *in;
-
-  /// Array of size FRAMES_PER_BUFFER * num_channels, containing amplitudes of the output wave in the current buffer.
-  double *out;
-
-  /// Contains information required to compute an FFT of the buffered waveform.
-  fftw_plan p;
-
-  /// Starting x-coordinate of the computed FFT graph.
-  int startIndex;
-
-  /// Size of the delta between each consecutive x-coordinate on the FFT graph.
-  int spectroSize;
-} streamCallbackData;
 
 /**
  * Check and output errors in the portaudio stream.
