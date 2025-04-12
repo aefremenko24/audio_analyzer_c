@@ -5,9 +5,11 @@
 #include "frequencies.h"
 
 /**
- * Initializes the frequency display window using ncurses, given the number of channels in the input.
+ * Initializes the frequency display window using ncurses, given the number
+ * of channels in the input.
  *
- * @param num_chan number of channels in the input; affects the initial y position of the window.
+ * @param num_chan number of channels in the input; affects the initial
+ * y position of the window.
  */
 void init_freq_win(int num_chan) {
   FREQ_WIN = newwin(FREQ_WIN_HEIGHT, WIN_WIDTH, num_chan + 1 + MARGIN, 0);
@@ -16,7 +18,8 @@ void init_freq_win(int num_chan) {
 
 /**
  * Renders the volume representation of the given input buffer.
- * The volume is rendered as a line of '=' characters of length between 0 and WIN_WIDTH.
+ * The volume is rendered as a line of '=' characters of length
+ * between 0 and WIN_WIDTH.
  *
  * @param inputBuffer Input buffer to compute and render the frequencies for.
  * @param framesPerBuffer Number of frames in the buffer.
@@ -27,6 +30,9 @@ void streamCallBackFrequencies(
     void *userData
 ) {
   float *in = (float *) inputBuffer;
+  float *out = (float *) outputBuffer;
+
+  const int NUM_OUTPUT_CHANNELS = num_output_channels;
 
   streamCallbackData *callbackData = (streamCallbackData *) userData;
 
@@ -42,14 +48,29 @@ void streamCallBackFrequencies(
 
   for (int i = 0; i < WIN_WIDTH; i++) {
     float freq = powf((float)i / ((float) WIN_WIDTH), 2);
-    double proportion = callbackData->out[(int)((float)callbackData->startIndex + freq * (float)callbackData->spectroSize)] / 5;
+    double proportion = callbackData->out[
+      (int)((float)callbackData->startIndex +
+        freq * (float)callbackData->spectroSize)
+      ] / 5;
 
     if (fabs(proportion) > current_max[i]) {
       current_max[i] = (float)fmin(fabs(proportion), 1.0);
     }
 
+    for (unsigned long i = 0;
+      i < framesPerBuffer * NUM_OUTPUT_CHANNELS;
+      i += NUM_OUTPUT_CHANNELS) {
+      for (unsigned long channelNum = 0;
+        channelNum < NUM_OUTPUT_CHANNELS;
+        channelNum++) {
+        *out++ = in[i];
+        *out++ = in[i];
+      }
+    }
+
     for (int j = 1; j < FREQ_WIN_HEIGHT; j++) {
-      float desired_level = (float) ((FREQ_WIN_HEIGHT) - j) / (float) FREQ_WIN_HEIGHT;
+      float desired_level = (float) ((FREQ_WIN_HEIGHT) - j) /
+        (float) FREQ_WIN_HEIGHT;
       wmove(FREQ_WIN, j, i + 1);
 
       if (proportion >= desired_level) {
@@ -74,15 +95,18 @@ void streamCallBackFrequencies(
 streamCallbackData *init_spectro_data() {
   streamCallbackData *spectroData;
 
-  spectroData = (streamCallbackData *) malloc(sizeof(streamCallbackData));
-  spectroData->in = (double *) fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
-  spectroData->out = (double *) (double *) fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
+  spectroData = (streamCallbackData *)
+  malloc(sizeof(streamCallbackData));
+  spectroData->in = (double *)
+  fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
+  spectroData->out = (double *) (double *)
+  fftw_malloc(sizeof(double) * FRAMES_PER_BUFFER);
   if (spectroData->in == NULL || spectroData->out == NULL) {
     printf("Could not allocate spectro data.\n");
     exit(EXIT_FAILURE);
   }
-  spectroData->p = fftw_plan_r2r_1d(FRAMES_PER_BUFFER, spectroData->in, spectroData->out,
-                                    FFTW_R2HC, FFTW_ESTIMATE);
+  spectroData->p = fftw_plan_r2r_1d(FRAMES_PER_BUFFER, spectroData->in,
+    spectroData->out, FFTW_R2HC, FFTW_ESTIMATE);
 
   float sampleRatio = FRAMES_PER_BUFFER / SAMPLE_RATE;
   spectroData->startIndex = (int)ceilf(sampleRatio * SPECTRO_FREQ_START);

@@ -27,7 +27,8 @@ void decrement_current_max() {
 /**
  * Initializes the ncurses screen with windows for each section of the view.
  *
- * @param num_chan number of channels in the input; affects the total height of all windows on the screen.
+ * @param num_chan number of channels in the input; affects the total height
+ * of all windows on the screen.
  */
 void init_screen(int num_chan) {
   init_current_max();
@@ -54,7 +55,8 @@ void del_screen() {
 
 /**
  * Display the current local maxima on the frequency view window.
- * The local maxima are rendered as '_' characters above each x-coordinate on the frequency graph.
+ * The local maxima are rendered as '_' characters above each x-coordinate
+ * on the frequency graph.
  */
 void display_current_max() {
   int initial_x;
@@ -62,7 +64,10 @@ void display_current_max() {
   getyx(FREQ_WIN, initial_y, initial_x);
 
   for (int width_index = 0; width_index < WIN_WIDTH; width_index++) {
-    int y_pos = 1 + FREQ_WIN_HEIGHT - (int) ((float) FREQ_WIN_HEIGHT * current_max[width_index]);
+    int y_pos = 1 +
+              FREQ_WIN_HEIGHT -
+              (int) ((float) FREQ_WIN_HEIGHT *
+              current_max[width_index]);
 
     wmove(FREQ_WIN, y_pos, width_index);
     waddch(FREQ_WIN, '_');

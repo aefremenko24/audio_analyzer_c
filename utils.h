@@ -45,3 +45,5 @@ int num_output_channels;
  * @param err Portaudio error code.
  */
 void checkErr(PaError err);
+
+void error(const char *msg);

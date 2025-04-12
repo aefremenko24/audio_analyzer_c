@@ -18,7 +18,7 @@ else
     $(error Unsupported platform: $(PLATFORM))
 endif
 
-$(EXEC): main.c utils.c display.c frequencies.c stream.c user_prompts.c volume.c
+$(EXEC): main.c utils.c display.c frequencies.c stream.c user_prompts.c volume.c client.c server.c dispatch.c
 	$(CXX) $(ARGS) $(CLIB) -o $@ $^
 
 all: install-deps $(EXEC)

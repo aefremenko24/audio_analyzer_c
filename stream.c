@@ -5,6 +5,7 @@
 #include <fftw3.h>
 #include <ctype.h>
 #include <string.h>
+#include "dispatch.h"
 
 /**
  * Processes a single buffer and displays its visual representation on the screen.
@@ -25,9 +26,14 @@ static int streamCallBack(
   (void) timeInfo;
   (void) statusFlags;
 
+  float *in = (float *) inputBuffer;
+  float *out = (float *) outputBuffer;
+
   streamCallBackVolume(inputBuffer, outputBuffer, framesPerBuffer, num_input_channels, num_output_channels);
 
   streamCallBackFrequencies(inputBuffer, outputBuffer, framesPerBuffer, userData);
+
+  update_global_buffer(in, out);
 
   refresh_screen();
 

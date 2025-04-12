@@ -27,7 +27,6 @@ void streamCallBackVolume(
   float *out = (float *) outputBuffer;
 
   const int NUM_INPUT_CHANNELS = num_input_channels;
-  const int NUM_OUTPUT_CHANNELS = num_output_channels;
   float channelVolumes[NUM_INPUT_CHANNELS];
 
   for (unsigned long channelNum = 0; channelNum < NUM_INPUT_CHANNELS; channelNum++) {
@@ -37,13 +36,6 @@ void streamCallBackVolume(
   for (unsigned long i = 0; i < framesPerBuffer * NUM_INPUT_CHANNELS; i += NUM_INPUT_CHANNELS) {
     for (unsigned long channelNum = 0; channelNum < NUM_INPUT_CHANNELS; channelNum++) {
       channelVolumes[channelNum] = fmaxf(channelVolumes[channelNum], fabsf(in[i + channelNum]));
-    }
-  }
-
-  for (unsigned long i = 0; i < framesPerBuffer * NUM_OUTPUT_CHANNELS; i += NUM_OUTPUT_CHANNELS) {
-    for (unsigned long channelNum = 0; channelNum < NUM_OUTPUT_CHANNELS; channelNum++) {
-      *out++ = in[i];
-      *out++ = in[i];
     }
   }
 

@@ -16,3 +16,9 @@ void checkErr(PaError err) {
     exit(EXIT_FAILURE);
   }
 }
+
+void error(const char *msg)
+{
+  perror(msg);
+  exit(1);
+}
